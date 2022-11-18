@@ -1,52 +1,46 @@
-const express = require("express");
+
+const Express = require("express");
 const fs = require("fs");
-const path = require("path");
-const app = express();
+const app = Express();
+const morgan = require('morgan');
 
-app.use(express.static(path.join(__dirname, "public")));
-
-app.get("/", function (req, res) {
-  res.sendFile(path.join(__dirname + "/index.htm"));
+app.use(morgan('tiny'));
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/index.html");
 });
 
-app.get("/video", function (req, res) {
-  const path = "assets/sample.mp4";
-  const { size } = fs.statSync(path);
+
+app.get("/video", (req, res) => {
+
+  // file and fileSize
+  const filePath = "/media/video.mp4";
+  const { size } = fs.statSync(__dirname + filePath);
+
+  // get range from request headers
   const range = req.headers.range;
 
   if (range) {
-    const parts = range.replace(/bytes=/, "").split("-");
-    const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : size - 1;
+    //get the requested content length
+    const parts = range.replace(/bytes=/, "").split("-"),
+      start = Number(parts[0]),
+      end = parts[1] ? Number(parts[1]) : size - 1,
+      contentLength = end - start + 1;
 
-    if (start >= size) {
-      res
-        .status(416)
-        .send("Requested range not satisfiable\n" + start + " >= " + size);
-      return;
-    }
-
-    const chunksize = end - start + 1;
-    const file = fs.createReadStream(path, { start, end });
-    const head = {
+      // Set headers
+    const headers = {
       "Content-Range": `bytes ${start}-${end}/${size}`,
       "Accept-Ranges": "bytes",
-      "Content-Length": chunksize,
+      "Content-Length": contentLength,
       "Content-Type": "video/mp4",
     };
 
-    res.writeHead(206, head);
-    file.pipe(res);
-  } else {
-    const head = {
-      "Content-Length": size,
-      "Content-Type": "video/mp4",
-    };
-    res.writeHead(200, head);
-    fs.createReadStream(path).pipe(res);
+    // send back partial content
+    res.writeHead(206, headers);
+    const Stream = fs.createReadStream(__dirname + filePath);
+    Stream.pipe(res);
   }
 });
 
-app.listen(3000, function () {
-  console.log("Listening on port 3000!");
+app.listen({ port: 3000 }, function (err, address) {
+  console.log("connected");
 });
